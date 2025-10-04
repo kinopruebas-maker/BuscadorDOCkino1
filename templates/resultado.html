@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Resultado del Proceso</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f4f4f9; color: #333; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { background: #fff; padding: 30px 40px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 500px; }
+        h1 { color: #28a745; }
+        p { line-height: 1.6; }
+        .btn { display: inline-block; margin-top: 20px; padding: 12px 25px; background-color: #007bff; color: white; border: none; border-radius: 5px; font-size: 16px; text-decoration: none; }
+        .btn-secondary { background-color: #6c757d; }
+        .btn:hover { opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ mensaje_titulo }}</h1>
+        <p>{{ mensaje_cuerpo }}</p>
+
+        {% if archivo_descarga %}
+            <a href="/download/{{ archivo_descarga }}" class="btn">Descargar PDF Resaltado</a>
+        {% endif %}
+        <a href="/" class="btn btn-secondary">Volver a Empezar</a>
+    </div>
+</body>
+</html>
