@@ -14,12 +14,24 @@
         input[type="file"] { padding: 3px; }
         .btn { display: block; width: 100%; padding: 12px; background-color: #FF9933; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; text-align: center; text-decoration: none; }
         .btn:hover { background-color: #e68a2e; }
+        .flash-messages { list-style: none; padding: 0; margin-bottom: 20px; }
+        .flash-messages li { background: #f8d7da; color: #721c24; padding: 10px; border: 1px solid #f5c6cb; border-radius: 5px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
     <div class="container">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <ul class="flash-messages">
+                {% for message in messages %}
+                    <li>{{ message }}</li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
         <h1>Buscador y Resaltador de PDF</h1>
-        <form action="/procesar" method="post" enctype="multipart/form-data">
+        <form action="/procesar-formulario" method="post" enctype="multipart/form-data">
             <div class="form-group">
                 <label for="pdf_file">1. Selecciona tu archivo PDF:</label>
                 <input type="file" id="pdf_file" name="pdf_file" accept=".pdf" required>
