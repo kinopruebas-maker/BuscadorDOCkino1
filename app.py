@@ -1,3 +1,5 @@
+# app.py
+# Versión 2.0: Extracción de páginas con coincidencias.
 import os
 import fitz  # PyMuPDF
 import json
@@ -7,7 +9,6 @@ import io
 import logging
 
 # --- Configuración Inicial ---
-# Versión 1.3: Añadido logging detallado para depuración.
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 UPLOAD_FOLDER = 'uploads'
@@ -26,14 +27,7 @@ def archivo_permitido(filename):
 def highlight_pdf_api():
     app.logger.info("[MARCADOR PYTHON 1] Petición recibida en endpoint /highlight.")
     
-    # --- MARCADOR 2: Inspección de la solicitud ---
-    try:
-        app.logger.info(f"[MARCADOR PYTHON 2] Campos del formulario recibidos (request.form): {request.form.to_dict()}")
-        app.logger.info(f"[MARCADOR PYTHON 3] Archivos recibidos (request.files): {request.files.to_dict()}")
-    except Exception as e:
-        app.logger.error(f"Error al inspeccionar la solicitud: {e}")
-
-    # 1. Validación de la solicitud
+    # 1. Validación de la solicitud (sin cambios)
     if 'pdf_file' not in request.files:
         app.logger.error("[ERROR PYTHON] No se encontró 'pdf_file' en request.files.")
         return jsonify({ "success": False, "error": "Archivo no encontrado", "details": "La solicitud POST debe incluir una parte 'pdf_file'." }), 400
@@ -59,44 +53,66 @@ def highlight_pdf_api():
     pdf_bytes = file.read()
     
     try:
-        app.logger.info("[MARCADOR PYTHON 5] Intentando abrir el PDF con PyMuPDF.")
-        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        app.logger.info(f"PDF abierto exitosamente. El documento tiene {len(doc)} páginas.")
+        app.logger.info("[MARCADOR PYTHON 5] Abriendo PDF original con PyMuPDF.")
+        doc_original = fitz.open(stream=pdf_bytes, filetype="pdf")
+        app.logger.info(f"PDF original abierto. El documento tiene {len(doc_original)} páginas.")
         
         paginas_encontradas = set()
+        indices_paginas_con_coincidencias = []
         total_coincidencias = 0
 
-        for pagina in doc:
+        # --- NUEVA LÓGICA: PRIMERO BUSCAR, LUEGO PROCESAR ---
+        app.logger.info("[MARCADOR PYTHON 6] Iniciando fase de búsqueda en todo el documento.")
+        for i, pagina in enumerate(doc_original):
+            pagina_tiene_coincidencia = False
             for codigo in codigos_a_buscar:
                 instancias = pagina.search_for(codigo)
                 if instancias:
                     total_coincidencias += len(instancias)
                     paginas_encontradas.add(pagina.number + 1)
+                    pagina_tiene_coincidencia = True
+                    # Resaltar directamente en la página original
                     for inst in instancias:
                         resaltado = pagina.add_highlight_annot(inst)
-                        resaltado.set_colors(stroke=(1, 1, 0))
+                        resaltado.set_colors(stroke=(1, 1, 0)) # Amarillo
                         resaltado.update()
-        
-        app.logger.info(f"[MARCADOR PYTHON 6] Búsqueda finalizada. Total de coincidencias: {total_coincidencias}.")
+            
+            if pagina_tiene_coincidencia:
+                indices_paginas_con_coincidencias.append(i)
+
+        app.logger.info(f"[MARCADOR PYTHON 7] Búsqueda finalizada. Total de coincidencias: {total_coincidencias}. Páginas con coincidencias: {sorted(list(paginas_encontradas))}")
+
+        output_buffer = io.BytesIO()
 
         if total_coincidencias > 0:
-            output_buffer = io.BytesIO()
-            doc.save(output_buffer, garbage=4, deflate=True)
-            doc.close()
-            output_buffer.seek(0)
-            response_data = output_buffer.read()
-            filename_suffix = f"resaltado_{secure_filename(file.filename)}"
+            app.logger.info("[MARCADOR PYTHON 8] Creando nuevo PDF solo con las páginas resaltadas.")
+            # Crear un nuevo documento PDF vacío
+            doc_nuevo = fitz.open() 
+            
+            # Copiar solo las páginas con coincidencias al nuevo documento
+            for index in indices_paginas_con_coincidencias:
+                doc_nuevo.insert_pdf(doc_original, from_page=index, to_page=index)
+            
+            # Guardar el nuevo PDF en el buffer
+            doc_nuevo.save(output_buffer, garbage=4, deflate=True)
+            doc_nuevo.close()
+            filename_suffix = f"extracto_{secure_filename(file.filename)}"
         else:
-            doc.close()
-            response_data = pdf_bytes
-            filename_suffix = f"original_{secure_filename(file.filename)}"
+            # Si no hay coincidencias, devolvemos el PDF original para que el usuario pueda revisarlo
+            app.logger.info("[MARCADOR PYTHON 8] No se encontraron coincidencias. Se devolverá el PDF original.")
+            output_buffer.write(pdf_bytes)
+            filename_suffix = f"sin_coincidencias_{secure_filename(file.filename)}"
+        
+        doc_original.close()
+        output_buffer.seek(0)
+        response_data = output_buffer.read()
 
         response = Response(response_data, mimetype='application/pdf')
         pages_list = sorted(list(paginas_encontradas))
         response.headers['X-Pages-Found'] = json.dumps(pages_list)
         response.headers['Content-Disposition'] = f'attachment; filename="{filename_suffix}"'
         
-        app.logger.info(f"[MARCADOR PYTHON 7] Enviando respuesta PDF al cliente. Páginas con códigos: {pages_list}")
+        app.logger.info(f"[MARCADOR PYTHON 9] Enviando respuesta PDF al cliente.")
         return response
 
     except Exception as e:
@@ -104,7 +120,7 @@ def highlight_pdf_api():
         return jsonify({
             "success": False,
             "error": "Error al procesar el archivo PDF",
-            "details": f"El servicio no pudo leer o modificar el documento. Posiblemente está corrupto o tiene un formato no soportado. Error técnico: {str(e)}"
+            "details": f"El servicio no pudo leer o modificar el documento. Posiblemente está corrupto. Error técnico: {str(e)}"
         }), 500
 
 if __name__ == '__main__':
