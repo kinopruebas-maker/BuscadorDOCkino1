@@ -27,7 +27,7 @@ def archivo_permitido(filename):
 def highlight_pdf_api():
     app.logger.info("[MARCADOR PYTHON 1] Petición recibida en endpoint /highlight.")
     
-    # 1. Validación de la solicitud (sin cambios)
+    # 1. Validación de la solicitud
     if 'pdf_file' not in request.files:
         app.logger.error("[ERROR PYTHON] No se encontró 'pdf_file' en request.files.")
         return jsonify({ "success": False, "error": "Archivo no encontrado", "details": "La solicitud POST debe incluir una parte 'pdf_file'." }), 400
@@ -61,7 +61,7 @@ def highlight_pdf_api():
         indices_paginas_con_coincidencias = []
         total_coincidencias = 0
 
-        # --- NUEVA LÓGICA: PRIMERO BUSCAR, LUEGO PROCESAR ---
+        # --- LÓGICA MEJORADA: PRIMERO BUSCAR Y RESALTAR, LUEGO EXTRAER ---
         app.logger.info("[MARCADOR PYTHON 6] Iniciando fase de búsqueda en todo el documento.")
         for i, pagina in enumerate(doc_original):
             pagina_tiene_coincidencia = False
@@ -71,7 +71,7 @@ def highlight_pdf_api():
                     total_coincidencias += len(instancias)
                     paginas_encontradas.add(pagina.number + 1)
                     pagina_tiene_coincidencia = True
-                    # Resaltar directamente en la página original
+                    # Resaltar directamente en la página del documento original
                     for inst in instancias:
                         resaltado = pagina.add_highlight_annot(inst)
                         resaltado.set_colors(stroke=(1, 1, 0)) # Amarillo
@@ -86,19 +86,18 @@ def highlight_pdf_api():
 
         if total_coincidencias > 0:
             app.logger.info("[MARCADOR PYTHON 8] Creando nuevo PDF solo con las páginas resaltadas.")
-            # Crear un nuevo documento PDF vacío
+            # Crear un nuevo documento PDF en memoria
             doc_nuevo = fitz.open() 
             
-            # Copiar solo las páginas con coincidencias al nuevo documento
+            # Copiar solo las páginas que tuvieron coincidencias al nuevo documento
             for index in indices_paginas_con_coincidencias:
                 doc_nuevo.insert_pdf(doc_original, from_page=index, to_page=index)
             
-            # Guardar el nuevo PDF en el buffer
+            # Guardar el nuevo PDF (más pequeño) en el buffer
             doc_nuevo.save(output_buffer, garbage=4, deflate=True)
             doc_nuevo.close()
             filename_suffix = f"extracto_{secure_filename(file.filename)}"
         else:
-            # Si no hay coincidencias, devolvemos el PDF original para que el usuario pueda revisarlo
             app.logger.info("[MARCADOR PYTHON 8] No se encontraron coincidencias. Se devolverá el PDF original.")
             output_buffer.write(pdf_bytes)
             filename_suffix = f"sin_coincidencias_{secure_filename(file.filename)}"
