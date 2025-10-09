@@ -65,7 +65,7 @@ def highlight_pdf_api():
                         resaltado = pagina.add_highlight_annot(inst)
                         resaltado.set_colors(stroke=(1, 1, 0)) # Amarillo
                         resaltado.update()
-            
+        
             if pagina_tiene_coincidencia:
                 indices_paginas_con_coincidencias.append(i)
 
