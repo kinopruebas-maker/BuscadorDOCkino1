@@ -14,12 +14,33 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'super-secret-key-kino' 
 
+# --- CORS (permitir origenes específicos) ---
+ALLOWED_ORIGINS = {
+    "https://kinopruebas.gt.tc",
+    "http://kinopruebas.gt.tc",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080"
+}
+
+@app.after_request
+def add_cors_headers(resp):
+    origin = request.headers.get("Origin", "")
+    if origin in ALLOWED_ORIGINS:
+        resp.headers["Access-Control-Allow-Origin"] = origin
+        resp.headers["Vary"] = "Origin"
+        resp.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    return resp
+
+
 def archivo_permitido(filename):
     """Verifica si el archivo tiene una extensión permitida."""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'pdf'
 
-@app.route('/highlight', methods=['POST'])
+@app.route('/highlight', methods=['POST', 'OPTIONS'])
 def highlight_pdf_api():
+    if request.method == 'OPTIONS':
+        return Response(status=204)
     logging.info("[PYTHON] Petición de resaltado recibida.")
     
     if 'pdf_file' not in request.files:
